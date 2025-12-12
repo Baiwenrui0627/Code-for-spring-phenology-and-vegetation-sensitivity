@@ -1,4 +1,4 @@
-########## calculation_of_flash_drought_impact_on_vegetation_growth ###############
+########## calculation_of_vegetation_sensitivity_to_flash_drought ###############
 
 #### transfer kNDVI data to 5day resolution ####
 years<-2001:2021
@@ -69,6 +69,7 @@ for(i in c(1:664)){
   print(paste0("finish+",i))
 }
 
+
 #### transfer to normalized kNDVI anomaly ####
 DOY<-rep(c(1:73),21)
 cal_norm_anomaly<-function(data_col){
@@ -84,6 +85,7 @@ cal_norm_anomaly<-function(data_col){
     return(c(long_term_daily_means,long_term_daily_sd,z_score_data))
   }else{return(rep(NA,(1533+73*2)))}
 }
+
 for(i in c(1:664)){
   file<-paste0("path_to_deseason_detrend_kNDVI_5_day_row_data.csv")
   if(file.exists(file)){
@@ -95,8 +97,9 @@ for(i in c(1:664)){
   print(paste0("finish+",i))
 }
 
+
 ##### calculate (1)total_actual_loss,(2)Impact,(3)Recovery Rate,(4)impact_time_point,(5)recovery_time_point,(6)threshold_norm_anomaly ######
-# Among them, "impact" refers to the flash drought impact as mentioned in our research.
+# These are process variables that may be used in subsequent calculations of vegetation sensitivity to flash drought in our research.
 # The LAI in the following function refer to vegetation indicators (kNDVI, GOSIF, VOD, LAI).
 
 resilience<-function(data_col,mean_sd_col,detrend_col,drought_col,phe_data){
@@ -207,4 +210,57 @@ resilience<-function(data_col,mean_sd_col,detrend_col,drought_col,phe_data){
     }
     return(c(total_actual_LAI_loss,Impact,Rate,impact_time_point,recovery_time_point,threshold_norm_anomaly,rep(NA,500-length(Impact)*6)))
   }else{return(rep(NA,500))}
+}
+
+for(i in c(1:665)){
+  file<-"path_to_flash_drought"
+  if(file.exists(file)){
+    flashdrought.csv <- read.csv(file)
+    data.csv<-read.csv("path_to_kNDVI_norm_anomaly")
+    mean.sd.csv<-read.csv("path_to_kNDVI_means_and_sds")
+    detrend.csv<-read.csv("path_to_detrend_kNDVI")
+    data.phe<-read.csv("path_to_spring_and_autumn_phenology")
+    final.data <- as.data.frame(mapply(resilience, data.csv, mean.sd.csv, detrend.csv, flashdrought.csv, data.phe, SIMPLIFY = T))
+    write.csv(final.data,"output_path",row.names=F)
+  }
+  print(paste0("finish+",i))
+}
+
+
+######### vegetation sensitivity to flash drought is indicated by relative decline (%) ########
+cal_percent_decline<-function(actual_col,mean_sd_col,all_col){
+  # actual_col:actual kNDVI
+  # mean_sd_col:kNDVI means and sds
+  # all_col: output data from the above "resilience" function
+  all_col<-na.omit(all_col)
+  if(length(all_col)>0 & length(na.omit(actual_col))>0){
+    len<-length(all_col)/6
+    impact<-as.numeric(all_col[(len+1):(len*2)])
+    number<-which(!is.na(impact))
+    if(length(number)>0){
+      impact_time_point<-as.numeric((all_col[(len*3+1):(len*4)])[number])
+      threshold_norm_anomaly<-as.numeric((all_col[(len*5+1):(len*6)])[number])
+      
+      actual_data<-actual_col[impact_time_point]
+      potential_data<-c()
+      for(m in 1:length(threshold_norm_anomaly)){
+        potential_data[m]<-(threshold_norm_anomaly[m]*mean_sd_col[((impact_time_point[m]-1)%%73)+1+73])+mean_sd_col[((impact_time_point[m]-1)%%73+1)]
+      }
+      percent_decline<-((actual_data-potential_data)/potential_data)*100 # change to %
+      percent_decline[which(potential_data<0.1)]<-NA
+      return(c(percent_decline,rep(NA,40-length(percent_decline))))
+    }else{return(rep(NA,40))}
+  }else{return(rep(NA,40))}
+}
+
+for(i in c(1:665)){
+  file<-"path_to_output_data_in_the_above_resilience_function"
+  if(file.exists(file)){
+    all.csv <- read.csv(file)
+    actual.csv<-read.csv("path_to_detrend_kNDVI")
+    mean.sd.csv<-read.csv("path_to_kNDVI_means_and_sds")
+    final.data <- as.data.frame(mapply(cal_percent_decline, actual.csv, mean.sd.csv, all.csv, SIMPLIFY = T))
+    write.csv(final.data,"path_to_output_relative_decline",row.names=F)
+  }
+  print(paste0("finish+",i))
 }
