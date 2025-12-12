@@ -27,6 +27,7 @@ five_days_mean<-function(de_data){
     return(fiveday_avg)
   }else{return(rep(NA,1533))}
 }
+
 for(i in c(1:665)){
   file<-paste0("path_to_kNDVI_8_day_row_data.csv")
   if(file.exists(file)){
@@ -59,6 +60,7 @@ deseason_detrend_linear <- function(data_col) {
     return(round(detrended_data,digits = 6))
   }else{return(rep(NA,1533))}
 }
+
 for(i in c(1:664)){
   file<-paste0("path_to_kNDVI_5_day_row_data.csv")
   if(file.exists(file)){
@@ -264,3 +266,4 @@ for(i in c(1:665)){
   }
   print(paste0("finish+",i))
 }
+
