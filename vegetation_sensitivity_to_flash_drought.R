@@ -1,6 +1,6 @@
 ########## calculation_of_vegetation_sensitivity_to_flash_drought ###############
 
-#### transfer kNDVI data to 5day resolution ####
+#### transfer NDVI data to 5day resolution ####
 years<-2001:2021
 days_of_year <- sprintf("%03d",seq(1,361,8))
 dates <- c()
@@ -29,17 +29,17 @@ five_days_mean<-function(de_data){
 }
 
 for(i in c(1:665)){
-  file<-paste0("path_to_kNDVI_8_day_row_data.csv")
+  file<-paste0("path_to_NDVI_8_day_row_data.csv")
   if(file.exists(file)){
-    kNDVI.data <- read.csv(file)
-    final.data <- as.data.frame(mapply(five_days_mean, kNDVI.data, SIMPLIFY = T))    
-    fwrite(final.data,"path_to_kNDVI_5_day_row_data.csv",row.names=F)
+    NDVI.data <- read.csv(file)
+    final.data <- as.data.frame(mapply(five_days_mean, NDVI.data, SIMPLIFY = T))    
+    fwrite(final.data,"path_to_NDVI_5_day_row_data.csv",row.names=F)
   }
   print(paste0("finish+",i))
 }
 
 
-#### detrend and deseason kNDVI ####
+#### detrend and deseason NDVI ####
 years <- 2001:2021
 days_of_year <- sprintf("%03d",seq(3,365,5))
 dates <- c()
@@ -62,17 +62,17 @@ deseason_detrend_linear <- function(data_col) {
 }
 
 for(i in c(1:664)){
-  file<-paste0("path_to_kNDVI_5_day_row_data.csv")
+  file<-paste0("path_to_NDVI_5_day_row_data.csv")
   if(file.exists(file)){
-    kNDVI.data <- read.csv(file)
-    final.data <- as.data.frame(mapply(deseason_detrend_linear, kNDVI.data, SIMPLIFY = T))    
-    fwrite(final.data,"path_to_deseason_detrend_kNDVI_5_day_row_data.csv",row.names=F)
+    NDVI.data <- read.csv(file)
+    final.data <- as.data.frame(mapply(deseason_detrend_linear, NDVI.data, SIMPLIFY = T))    
+    fwrite(final.data,"path_to_deseason_detrend_NDVI_5_day_row_data.csv",row.names=F)
   }
   print(paste0("finish+",i))
 }
 
 
-#### transfer to normalized kNDVI anomaly ####
+#### transfer to normalized NDVI anomaly ####
 DOY<-rep(c(1:73),21)
 cal_norm_anomaly<-function(data_col){
   if(length(na.omit(data_col))>0){
@@ -89,12 +89,12 @@ cal_norm_anomaly<-function(data_col){
 }
 
 for(i in c(1:664)){
-  file<-paste0("path_to_deseason_detrend_kNDVI_5_day_row_data.csv")
+  file<-paste0("path_to_deseason_detrend_NDVI_5_day_row_data.csv")
   if(file.exists(file)){
     data.csv <- read.csv(file)
     final.data <- as.data.frame(mapply(cal_norm_anomaly, data.csv, SIMPLIFY = T))
-    fwrite(final.data[c(1:146),],"path_to_kNDVI_pentad_means_sds_row_data.csv",row.names=F)
-    fwrite(final.data[c(147:1679),],"path_to_kNDVI_pentad_norm_anomaly_row_data.csv",row.names=F)
+    fwrite(final.data[c(1:146),],"path_to_NDVI_pentad_means_sds_row_data.csv",row.names=F)
+    fwrite(final.data[c(147:1679),],"path_to_NDVI_pentad_norm_anomaly_row_data.csv",row.names=F)
   }
   print(paste0("finish+",i))
 }
@@ -102,12 +102,12 @@ for(i in c(1:664)){
 
 ##### calculate (1)total_actual_loss,(2)Impact,(3)Recovery Rate,(4)impact_time_point,(5)recovery_time_point,(6)threshold_norm_anomaly ######
 # These are process variables that may be used in subsequent calculations of vegetation sensitivity to flash drought in our research.
-# The LAI in the following function refer to vegetation indicators (kNDVI, GOSIF, VOD, LAI).
+# The LAI in the following function refer to vegetation indicators (NDVI, GOSIF, VOD, LAI).
 
 resilience<-function(data_col,mean_sd_col,detrend_col,drought_col,phe_data){
-  # data_col:kNDVI_norm_anomaly
-  # mean_sd_col:kNDVI means and sds
-  # detrend_col:actual kNDVI
+  # data_col:NDVI_norm_anomaly
+  # mean_sd_col:NDVI means and sds
+  # detrend_col:actual NDVI
   if(length(na.omit(drought_col))>1 & length(na.omit(data_col))>0 & length(na.omit(phe_data))>0){
     sos<-phe_data[1:21]
     eos<-phe_data[22:42]
@@ -218,9 +218,9 @@ for(i in c(1:665)){
   file<-"path_to_flash_drought"
   if(file.exists(file)){
     flashdrought.csv <- read.csv(file)
-    data.csv<-read.csv("path_to_kNDVI_norm_anomaly")
-    mean.sd.csv<-read.csv("path_to_kNDVI_means_and_sds")
-    detrend.csv<-read.csv("path_to_detrend_kNDVI")
+    data.csv<-read.csv("path_to_NDVI_norm_anomaly")
+    mean.sd.csv<-read.csv("path_to_NDVI_means_and_sds")
+    detrend.csv<-read.csv("path_to_detrend_NDVI")
     data.phe<-read.csv("path_to_spring_and_autumn_phenology")
     final.data <- as.data.frame(mapply(resilience, data.csv, mean.sd.csv, detrend.csv, flashdrought.csv, data.phe, SIMPLIFY = T))
     write.csv(final.data,"output_path",row.names=F)
@@ -231,8 +231,8 @@ for(i in c(1:665)){
 
 ######### vegetation sensitivity to flash drought is indicated by relative decline (%) ########
 cal_percent_decline<-function(actual_col,mean_sd_col,all_col){
-  # actual_col:actual kNDVI
-  # mean_sd_col:kNDVI means and sds
+  # actual_col:actual NDVI
+  # mean_sd_col:NDVI means and sds
   # all_col: output data from the above "resilience" function
   all_col<-na.omit(all_col)
   if(length(all_col)>0 & length(na.omit(actual_col))>0){
@@ -259,11 +259,12 @@ for(i in c(1:665)){
   file<-"path_to_output_data_in_the_above_resilience_function"
   if(file.exists(file)){
     all.csv <- read.csv(file)
-    actual.csv<-read.csv("path_to_detrend_kNDVI")
-    mean.sd.csv<-read.csv("path_to_kNDVI_means_and_sds")
+    actual.csv<-read.csv("path_to_detrend_NDVI")
+    mean.sd.csv<-read.csv("path_to_NDVI_means_and_sds")
     final.data <- as.data.frame(mapply(cal_percent_decline, actual.csv, mean.sd.csv, all.csv, SIMPLIFY = T))
     write.csv(final.data,"path_to_output_relative_decline",row.names=F)
   }
   print(paste0("finish+",i))
 }
+
 
