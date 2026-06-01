@@ -31,13 +31,13 @@ To set up the environment, please ensure you have R installed. You can install a
 * **Spatial Resolution:** 0.1° × 0.1°
 * **Preprocessing:** Daily soil moisture data are averaged into pentad (5-day) means and transformed into percentiles.
 
-### 3.2 `phenology_extraction.R`
+### 4.2 `phenology_extraction.R`
 * **Function:** Extracts spring and autumn phenology.
 * **Data Source:** GLASS NDVI data (https://www.glass.hku.hk/download.html).
 * **Temporal Coverage:** 2001–2021
 * **Spatial Resolution:** 0.1° × 0.1°
 
-### 3.3 `vegetation_sensitivity_to_flash_drought.R`
+### 4.3 `vegetation_sensitivity_to_flash_drought.R`
 * **Function:** Quantifies vegetation sensitivity to flash drought, represented as the relative decline (%) of vegetation proxies under drought.
 * **Data Source:** 
   * GLASS NDVI and LAI (https://www.glass.hku.hk/download.html). 
