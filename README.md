@@ -1,10 +1,10 @@
-1.	Overview
+1.	Overview: 
    This R code identifies flash drought events, extracts vegetation phenology, and quantifies the vegetation sensitivities to flash drought events, using NDVI/LAI/GOSIF/VOD as proxies.
 
-2.	System Requirements
+2.	System Requirements: 
    •Software: R V4.3.2
 
-3.	Code instruction 
+3.	Code instruction: 
 The study area of this research covers the Northern Hemisphere north of 23.5°N, with all data preprocessed to a 0.1° spatial resolution. There is a total of 665 latitudinal bands (at 0.1° intervals) from 90°N down to 23.5°N. I have provided a sample dataset for the code, which represents the data at the 400th latitude band.
 
 3.1 flash_drought_identification.R
