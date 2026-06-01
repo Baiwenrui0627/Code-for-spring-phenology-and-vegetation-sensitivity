@@ -1,124 +1,139 @@
-######## phenology extraction ##########
+################ Extract spring and autumn phenology using 0.1° NDVI data and different thresholds ##########
+library(data.table)
 
-##### HANTS #####
-range_matrix<-as.matrix(raster("path_to_study_range"))
+# HANTS curve fitting ####
+range_matrix<-as.matrix(raster("final_range_res0.1.tif"))
 time<-seq(1,361,8)
-FFT_smooth<-function(data,K=9){
+FFT_smooth<-function(data,K=8){
+  N <- length(data)
   z<-fft(data) 
-  order<-order(Mod(z),decreasing = T) 
-  y<-rep(0,times=length(data))
-  for(h in 1:length(data)){
-    for(k in order[1:K]){
-      y[h]=y[h]+z[k]*exp(2*pi*1i*(k-1)*(h-1)/length(data))
-    }
-  }
-  return(Re(y)/length(data))
+  mod_z <- Mod(z)
+  threshold <- sort(mod_z, decreasing = TRUE)[K] 
+  z[mod_z < threshold] <- 0 
+  y <- Re(fft(z, inverse = TRUE)) / N 
+  return(y)
 }
 HANTS<-function(ndvi_col,range){
   if(length(na.omit(range))==1){
-    result.new<-c()
+    result.new<-numeric(7665)
     for(year in 1:21){
       ndvi.raw.data<-ndvi_col[c(((year-1)*46+1):(year*46))]
       x<-time
-      xout<-c(1:361)
-      chazhi<-approx(x,ndvi.raw.data,xout,method = "linear")
-      yout<-chazhi[[2]]
-      result<-FFT_smooth(yout,K=9)
+      xout<-c(1:365)
+      chazhi <- approx(x, ndvi.raw.data, xout, method = "linear", rule = 2)
+      yout<-chazhi$y
+      result<-FFT_smooth(yout,K=8)
       result_x<-result[x]
       diff<-result_x-ndvi.raw.data
-      while(length(diff[diff>=0.05])>0){
-        omit<-which(diff>=0.05)
-        x<-x[-omit]
-        if(length(x)<30){ break }
-        ndvi.raw.data<-ndvi.raw.data[-omit]
-        xout<-c(min(x):max(x))
-        chazhi_new<-approx(x,ndvi.raw.data,xout,method = "linear")
-        yout_new<-chazhi_new[[2]]
-        result<-FFT_smooth(yout_new,K=9)
-        result_x<-result[x]
-        diff<-result_x-ndvi.raw.data
+      while (any(diff >= 0.05)) {
+        omit <- which(diff >= 0.05)
+        x <- x[-omit]
+        if (length(x) < 30) { break }
+        ndvi.raw.data <- ndvi.raw.data[-omit]
+        chazhi_new <- approx(x, ndvi.raw.data, xout, method = "linear", rule = 2)
+        yout_new <- chazhi_new$y
+        result <- FFT_smooth(yout_new, K = 8)
+        result_x <- result[x]
+        diff <- result_x - ndvi.raw.data
       }
-      result.new[c(((year-1)*365+1):(year*365))]<-c(rep(NA,(min(xout)-1)),result,rep(NA,(365-max(xout))))
+      result.new[((year - 1) * 365 + 1):(year * 365)] <- result
     }
-    return(result.new)
+    return(round(result.new,digits=5))
   }else{return(c(rep(NA,7665)))}
 }
 for(i in c(1:665)){
   if(length(na.omit(range_matrix[i,]))>0){
-    data.ndvi<-read.csv("path_to_NDVI_row_data.csv")[-1,]
+    data.ndvi<-as.data.frame(fread(paste0("NDVI_0.1_raw_",sprintf("%03d",i),".csv")))
     data.range<-as.data.frame(t(range_matrix[i,]))
-    final.data <- as.data.frame(mapply(HANTS, data.ndvi,data.range, SIMPLIFY = T))
-    write.csv(final.data,"path_to_saved_row_HANTS_curve.csv",row.names=F)
+    final.data <- as.data.frame(mapply(HANTS, data.ndvi, data.range, SIMPLIFY = T))
+    Sys.sleep(1)
+    fwrite(final.data,paste0("HANTS_curve_res0.1_",sprintf("%03d",i),".csv"),row.names=F,na = "NA",quote = FALSE)
   }
   print(paste0("finish+",i))
+  gc()
 }
 
-##### Extract spring phenology and autumn phenology #####
-
-range_matrix<-as.matrix(raster("path_to_study_range"))
-DOY<-c(1:365)
-row_indices <- split(1:7665, rep(1:365, length.out=7665))
-phenology_extract<-function(curve_col,range){
-  if(length(na.omit(range))==1){
-    result<-c()
-    for (time_point in 1:365) { 
-      time_rows <- row_indices[[time_point]]
-      result[time_point]<-mean(curve_col[time_rows],na.rm=T)
-    } 
-    mean.df<-na.omit(data.frame(DOY,result))
-    max.meandata<-max(mean.df$result,na.rm=T)
-    max.time<-round(median(mean.df$DOY[which(mean.df$result==max.meandata)]),digits=0)
-    left.curve<-mean.df[c(1:(max.time-min(mean.df$DOY))),]
-    left.min.meandata<-min(left.curve$result,na.rm=T)
-    left.yuzhi<-(0.2*(max.meandata-left.min.meandata)+left.min.meandata)
-    right.curve<-mean.df[c((max.time-min(mean.df$DOY)+2):length(mean.df$DOY)),]
-    right.min.meandata<-min(right.curve$result,na.rm=T)
-    right.yuzhi<-(0.2*(max.meandata-right.min.meandata)+right.min.meandata)
-    result.SOS<-c()
-    result.POS<-c()
-    result.EOS<-c()
-    for(year in 1:21){
-      curve.data<-curve_col[c(((year-1)*365+1):(year*365))]
-      curve.df<-na.omit(data.frame(DOY,curve.data))
-      POS<-round(median(curve.df$DOY[which(curve.df$curve.data==max(curve.df$curve.data,na.rm=T))]),digits=0)
-      result.POS[year]<-POS
-      curve1<-curve.df[c(1:(POS-min(curve.df$DOY))),]
-      curve1<-curve1[c(which(curve1$curve.data==min(curve1$curve.data,na.rm=T)):length(curve1$DOY)),]
-      if(length(which((curve1$curve.data[-nrow(curve1)]-left.yuzhi) * (curve1$curve.data[-1]-left.yuzhi) < 0))>0){
-        crossing_points <- min(which((curve1$curve.data[-nrow(curve1)]-left.yuzhi) * (curve1$curve.data[-1]-left.yuzhi) < 0),na.rm=T)
-        SOS<-curve1$DOY[which((curve1$curve.data-left.yuzhi)==min(curve1$curve.data[crossing_points:(crossing_points+1)]-left.yuzhi,na.rm=T))]
-      }else{SOS<-(-1)}
-      result.SOS[year]<-SOS
-      curve2<-curve.df[c((POS-min(curve.df$DOY)+2):length(curve.df$DOY)),]
-      curve2<-curve2[c(1:which(curve2$curve.data==min(curve2$curve.data,na.rm=T))),]
-      if(length(which((curve2$curve.data[-nrow(curve2)]-right.yuzhi) * (curve2$curve.data[-1]-right.yuzhi) < 0))>0){
-        crossing_points2 <- max(which((curve2$curve.data[-nrow(curve2)]-right.yuzhi) * (curve2$curve.data[-1]-right.yuzhi) < 0),na.rm=T)
-        EOS<-curve2$DOY[which((curve2$curve.data-right.yuzhi)==min(curve2$curve.data[crossing_points2:(crossing_points2+1)]-right.yuzhi,na.rm=T))]
-      }else{EOS<-(-1)}
-      result.EOS[year]<-EOS
+# Extract spring and autumn phenology using different thresholds ####
+phenology_extract <- function(curve_col, threshold = 0.2) {
+  if (sum(!is.na(curve_col)) < 7000) {  
+    return(rep(NA, 65)) 
+  } # Returns 2 thresholds + 21*SOS + 21*POS + 21*EOS = 65 NAs
+  curve_mat <- matrix(curve_col, nrow = 365) 
+  mean_curve <- rowMeans(curve_mat, na.rm = TRUE) 
+  max_meandata <- max(mean_curve, na.rm = TRUE) 
+  max_time <- round(median(which(mean_curve == max_meandata)),digits=0)
+  
+  left_min <- min(mean_curve[1:max_time], na.rm = TRUE)
+  left_yuzhi <- threshold * (max_meandata - left_min) + left_min
+  right_min <- min(mean_curve[max_time:365], na.rm = TRUE)
+  right_yuzhi <- threshold * (max_meandata - right_min) + right_min
+  
+  result_SOS <- numeric(21)
+  result_POS <- numeric(21)
+  result_EOS <- numeric(21)
+  for (year in 1:21) {
+    yearly_curve <- curve_mat[, year] 
+    POS <- round(median(which(yearly_curve == max(yearly_curve, na.rm = TRUE))),digits=0) 
+    result_POS[year] <- POS
+    # --- spring phenology ---
+    left_part <- yearly_curve[1:POS]
+    min_left_idx <- which.min(left_part)
+    search_left <- left_part[min_left_idx:length(left_part)] 
+    cross_up <- which(search_left[-length(search_left)] < left_yuzhi & search_left[-1] >= left_yuzhi) 
+    if (length(cross_up) > 0) {
+      result_SOS[year] <- min_left_idx - 1 + cross_up[1] 
+    } else { result_SOS[year] <- NA }
+    # --- autumn phenology ---
+    right_part <- yearly_curve[POS:365]
+    min_right_idx <- which.min(right_part)
+    search_right <- right_part[1:min_right_idx]
+    cross_down <- which(search_right[-length(search_right)] >= right_yuzhi & search_right[-1] < right_yuzhi) 
+    if (length(cross_down) > 0) {
+      result_EOS[year] <- (POS - 1) + cross_down[length(cross_down)]
+    } else {result_EOS[year] <- NA}
+  }
+  return(c(left_yuzhi, right_yuzhi, result_SOS, result_POS, result_EOS))
+}
+thresholds <- c(0.2, 0.3, 0.4)
+for (i in c(1:665)) {
+  file <- paste0("HANTS_curve_res0.1_", sprintf("%03d", i), ".csv")
+  if (file.exists(file)) {
+    curve.df<-as.data.frame(fread(file))
+    for (th in thresholds) {
+      final.data <- as.data.frame(mapply(phenology_extract, curve.df, MoreArgs = list(threshold = th), SIMPLIFY = TRUE))
+      Sys.sleep(1)
+      out_file <- paste0("HANTS_phenology_th", th, "_", sprintf("%03d", i), ".csv")
+      fwrite(final.data, out_file,row.names=F,na = "NA",quote = FALSE)
     }
-    return(c(left.yuzhi,right.yuzhi,result.SOS,result.POS,result.EOS))
-  }else{return(rep(NA,105))}
-}
-
-for(i in c(1:665)){
-  file<-paste0("path_to_saved_row_HANTS_curve.csv")
-  if(file.exists(file) & length(na.omit(range_matrix[i,]))>0){
-    data.range<-as.data.frame(t(range_matrix[i,]))
-    curve.csv<-read.csv(file)
-    final.data <- as.data.frame(mapply(phenology_extract,curve.csv,data.range, SIMPLIFY = T))
-    write.csv(final.data,"path_to_saved_phenology.csv",row.names=F)
   }
-  print(paste0("finish+",i))
+  gc()
+  print(paste0("finish: ", i))
 }
 
-
-##### Remove outliers #####
-
-fun_mad<-function(data){
-  mad.data<-mad(data,na.rm=T)
-  median.data<-median(data,na.rm=T)
-  data[data>(median.data+2.5*mad.data)|data<(median.data-2.5*mad.data)]<-NA
+# Exclude spring and autumn phenology data exceeding 2.5 times the Median Absolute Deviation (MAD) ########
+fun_mad <- function(data){
+  mad.data <- mad(data, na.rm = TRUE)
+  median.data <- median(data, na.rm = TRUE)
+  if (is.na(mad.data) || mad.data == 0) return(data)
+  data[abs(data - median.data) > 2.5 * mad.data] <- NA
   return(data)
 }
-
+thresholds <- c(0.2, 0.3, 0.4)
+for (th in thresholds) {
+  th_str <- paste0("th", th)
+  for(i in 1:665){
+    file <- paste0("HANTS_phenology_", th_str, "_", sprintf("%03d", i), ".csv")
+    if(file.exists(file)){
+      data.all <- fread(file)
+      data.SOS <- data.all[3:23, ]
+      data.EOS <- data.all[45:65, ]
+      data.SOS_clean <- data.SOS[, lapply(.SD, fun_mad)]
+      data.EOS_clean <- data.EOS[, lapply(.SD, fun_mad)]
+      out_file <- paste0("phenology_select_", th_str, "_",sprintf("%03d", i), ".csv")
+      fwrite(rbind(data.SOS_clean, data.EOS_clean), out_file, row.names = FALSE, na = "NA", quote = FALSE)
+      Sys.sleep(0.5)
+    }
+  }
+  print(paste0("========== Threshold ", th_str, " Finished! =========="))
+  gc() 
+}
