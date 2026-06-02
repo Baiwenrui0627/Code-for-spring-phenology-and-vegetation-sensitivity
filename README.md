@@ -46,3 +46,9 @@ To set up the environment, please ensure you have R installed. You can install a
 * **Temporal Coverage:** 2001–2021
 * **Spatial Resolution:** 0.1° × 0.1°
 * **Preprocessing:** All data are averaged into pentad (5-day) means. The vegetation proxy data were detrended to obtain detrended data, which were then deseasonalized into z-scores.
+
+## 5. Figure Generation
+
+All geographical maps presented in the manuscript were generated using **ESRI ArcGIS Desktop version 10.6**.
+All other statistical plots and charts were created using **R**. 
+The underlying datasets and R scripts required to reproduce these figures are provided in the `Figure_data_and_code` folder within this repository.
